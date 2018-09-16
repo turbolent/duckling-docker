@@ -1,21 +1,31 @@
-FROM alpine
+FROM haskell:8
 
-RUN apk add --no-cache curl ghc musl-dev pcre-dev git zlib-dev
-
-RUN curl -sSL https://get.haskellstack.org/ | sh
-
-RUN git clone https://github.com/facebookincubator/duckling.git
+RUN git clone https://github.com/facebook/duckling.git
 
 WORKDIR /duckling
 
-RUN stack build --system-ghc --copy-bins --local-bin-path /usr/local/bin
+RUN git checkout tags/v0.1.6.1
 
+RUN apt-get update && apt-get install -qq -y --fix-missing --no-install-recommends \
+    libpcre3-dev \    
+    build-essential
 
-FROM alpine
+RUN stack setup
 
-RUN apk add --no-cache pcre zlib gmp libffi tzdata
+RUN stack build --copy-bins --local-bin-path /usr/local/bin
+
+FROM debian:stretch-slim
+
+RUN apt-get update && apt-get install -y \
+   libpcre3 \
+   zlib1g \
+   libgmp10 \
+   tzdata
 
 COPY --from=0 /usr/local/bin/duckling-example-exe /usr/local/bin/duckling
+
+# NOTE: very important, otherwise PCRE fails for whatever reason
+ENV LANG C.UTF-8
 
 CMD exec duckling
 
